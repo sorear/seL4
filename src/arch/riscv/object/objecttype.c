@@ -192,6 +192,10 @@ word_t Arch_getObjectSize(word_t t)
     case seL4_RISCV_Tera_Page:
         return seL4_TeraPageBits;
 #endif
+    case seL4_RISCV_Span:
+        /* fixme: move this */
+        if (t < 2) return 99;
+        return t;
     default:
         fail("Invalid object type");
         return 0;
@@ -275,6 +279,28 @@ cap_t Arch_createObject(object_t t, void *regionBase, word_t userSize, bool_t
     }
 #endif
 
+    case seL4_RISCV_Span: {
+        bool_t granularity;
+        word_t length;
+
+        if (wordBits == 32 && userSize >= 26) {
+            granularity = true;
+            length = BIT(userSize - 10);
+        } else {
+            granularity = false;
+            length = BIT(userSize - 2);
+        }
+
+        return cap_span_cap_new(
+                   (word_t)regionBase,     /* capSpBaseOrSet */
+                   length,                 /* capSpLengthOrIndex */
+                   granularity,            /* capSpGranularity */
+                   0,                      /* capSpIsMapped */
+                   1,                      /* capSpIsWritable */
+                   deviceMemory,           /* capSpIsDevice */
+               );
+    }
+
     case seL4_RISCV_PageTableObject:
         /** AUXUPD: "(True, ptr_retyps 1
               (Ptr (ptr_val \<acute>regionBase) :: (pte_C[512]) ptr))" */
@@ -327,6 +353,7 @@ bool_t Arch_isFrameType(word_t type)
 #endif
     case seL4_RISCV_Mega_Page:
     case seL4_RISCV_4K_Page:
+    case seL4_RISCV_Span:
         return true;
     default:
         return false;
