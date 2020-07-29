@@ -38,6 +38,10 @@ deriveCap_ret_t Arch_deriveCap(cte_t *slot, cap_t cap)
         return ret;
 
     case cap_span_cap:
+        ret.cap = getOriginalSpan(cap);
+        ret.status = EXCEPTION_NONE;
+        return ret;
+
     case cap_asid_control_cap:
     case cap_asid_pool_cap:
         ret.cap = cap;
@@ -100,6 +104,18 @@ finaliseCap_ret_t Arch_finaliseCap(cap_t cap, bool_t final)
             } else {
                 unmapPageTable(asid, cap_page_table_cap_get_capPTMappedAddress(cap), pte);
             }
+        }
+        break;
+    case cap_span_cap:
+        if (cap_span_cap_get_capSpIsMapped(cap)) {
+            unmapSpan(SPAN_SET_PTR(cap_span_cap_get_capSpBaseOrSet(cap)),
+                      cap_span_cap_get_capSpLengthOrIndex(cap),
+                      false);
+        }
+        break;
+    case cap_span_set_cap:
+        if (final) {
+            unmapAllSpans(SPAN_SET_PTR(cap_span_set_cap_get_capSSetPtr(cap)));
         }
         break;
     case cap_asid_pool_cap:

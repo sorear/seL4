@@ -551,6 +551,61 @@ void unmapPage(vm_page_size_t page_size, asid_t asid, vptr_t vptr, pptr_t pptr)
     sfence();
 }
 
+cap_t getOriginalSpan(cap_t cap)
+{
+    if (cap_span_cap_get_capSpIsMapped(cap)) {
+        word_t index, base, length;
+        span_set_t *set;
+
+        set = SPAN_SET_PTR(cap_span_cap_get_capSpBaseOrSet(cap));
+        index = cap_span_cap_get_capSpLengthOrIndex(cap);
+
+        switch ((set->pmpcfg[index / 8] >> (3 + (index % 8) * 8)) & 3) {
+            case 0:
+                fail("Trying to unmap an umapped span");
+            case 1:
+                base = index == 0 ? 0 : set->pmpaddr[index + 1];
+                length = set->pmpaddr[index] - base;
+                break;
+            case 2:
+                base = set->pmpaddr[index];
+                length = 1;
+            case 3:
+                base = set->pmpaddr[index] & (set->pmpaddr[index] + 1);
+                length = 2 * (~set->pmpaddr[index] & (set->pmpaddr[index] + 1));
+        }
+
+        if (cap_span_cap_get_capSpGranularity(cap)) {
+            cap = cap_span_cap_set_capSpLengthOrIndex(cap, length >> 8);
+        } else {
+            cap = cap_span_cap_set_capSpLengthOrIndex(cap, length);
+        }
+        cap = cap_span_cap_set_capSpBaseOrSet(cap, base * 4);
+        cap = cap_span_cap_set_capSpIsMapped(cap, 0);
+    }
+    return cap;
+}
+
+void unmapSpan(span_set_t *set, word_t index, bool_t updateSlot)
+{
+    /* fixme: wordsize, coding style */
+    if (((set->pmpcfg[index / 8] >> (3 + (index % 8) * 8)) & 3) != 0) {
+        if (updateSlot) {
+            CTE_PTR(set->backlink[index])->cap =
+                getOriginalSpan(CTE_PTR(set->backlink[index])->cap);
+        }
+        set->pmpcfg[index / 8] &= 3 << (3 + (index % 8) * 8);
+    }
+}
+
+void unmapAllSpans(span_set_t *set)
+{
+    /* fixme: pmp configurability */
+    for (word_t index = 0; index < 8; index++) {
+        unmapSpan(set, index, true);
+    }
+}
+
 void setVMRoot(tcb_t *tcb)
 {
     cap_t threadRoot;

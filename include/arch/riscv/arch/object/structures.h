@@ -141,6 +141,8 @@ static inline word_t CONST cap_get_archCapSizeBits(cap_t cap)
     }
 }
 
+/* fixme: circular dep */
+cap_t getOriginalSpan(cap_t cap);
 static inline void *CONST cap_get_archCapPtr(cap_t cap)
 {
     cap_tag_t ctag;
@@ -153,6 +155,7 @@ static inline void *CONST cap_get_archCapPtr(cap_t cap)
         return (void *)(cap_frame_cap_get_capFBasePtr(cap));
 
     case cap_span_cap:
+        cap = getOriginalSpan(cap);
         return (void *)(cap_span_cap_get_capSpBaseOrSet(cap));
 
     case cap_page_table_cap:
