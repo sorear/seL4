@@ -74,7 +74,7 @@ exception_t decodeCNodeInvocation(word_t invLabel, word_t length, cap_t cap,
     if (invLabel >= CNodeCopy && invLabel <= CNodeMutate) {
         cte_t *srcSlot;
         word_t srcIndex, srcDepth, capData;
-        bool_t isMove;
+        bool_t isMove, isSibling;
         seL4_CapRights_t cap_rights;
         cap_t srcRoot, newCap;
         deriveCap_ret_t dc_ret;
@@ -130,7 +130,21 @@ exception_t decodeCNodeInvocation(word_t invLabel, word_t length, cap_t cap,
             }
             newCap = dc_ret.cap;
             isMove = false;
+            isSibling = false;
+            break;
 
+        case CNodeCopySibling:
+            dc_ret = deriveCap(srcSlot, srcCap);
+            if (dc_ret.status != EXCEPTION_NONE) {
+                userError("Error deriving cap for CNode Copy operation.");
+                return dc_ret.status;
+            }
+            newCap = dc_ret.cap;
+            if (cap_capType_equals(newCap, cap_untyped_cap)) {
+                newCap = cap_null_cap_new();
+            }
+            isMove = false;
+            isSibling = true;
             break;
 
         case CNodeMint:
@@ -151,12 +165,14 @@ exception_t decodeCNodeInvocation(word_t invLabel, word_t length, cap_t cap,
             }
             newCap = dc_ret.cap;
             isMove = false;
+            isSibling = false;
 
             break;
 
         case CNodeMove:
             newCap = srcSlot->cap;
             isMove = true;
+            isSibling = false;
 
             break;
 
@@ -170,6 +186,7 @@ exception_t decodeCNodeInvocation(word_t invLabel, word_t length, cap_t cap,
             capData = getSyscallArg(4, buffer);
             newCap = updateCapData(true, capData, srcSlot->cap);
             isMove = true;
+            isSibling = false;
 
             break;
 
@@ -187,6 +204,8 @@ exception_t decodeCNodeInvocation(word_t invLabel, word_t length, cap_t cap,
         setThreadState(NODE_STATE(ksCurThread), ThreadState_Restart);
         if (isMove) {
             return invokeCNodeMove(newCap, srcSlot, destSlot);
+        } else if (isSibling) {
+            return invokeCNodeInsertSibling(newCap, srcSlot, destSlot);
         } else {
             return invokeCNodeInsert(newCap, srcSlot, destSlot);
         }
@@ -340,6 +359,13 @@ exception_t invokeCNodeInsert(cap_t cap, cte_t *srcSlot, cte_t *destSlot)
     return EXCEPTION_NONE;
 }
 
+exception_t invokeCNodeInsertSibling(cap_t cap, cte_t *srcSlot, cte_t *destSlot)
+{
+    cteInsertSibling(cap, srcSlot, destSlot);
+
+    return EXCEPTION_NONE;
+}
+
 exception_t invokeCNodeMove(cap_t cap, cte_t *srcSlot, cte_t *destSlot)
 {
     cteMove(cap, srcSlot, destSlot);
@@ -438,6 +464,38 @@ void cteInsert(cap_t newCap, cte_t *srcSlot, cte_t *destSlot)
     if (mdb_node_get_mdbNext(newMDB)) {
         mdb_node_ptr_set_mdbPrev(
             &CTE_PTR(mdb_node_get_mdbNext(newMDB))->cteMDBNode,
+            CTE_REF(destSlot));
+    }
+}
+
+void cteInsertSibling(cap_t newCap, cte_t *srcSlot, cte_t *destSlot)
+{
+    mdb_node_t srcMDB, newMDB;
+    cap_t srcCap;
+
+    srcMDB = srcSlot->cteMDBNode;
+    srcCap = srcSlot->cap;
+
+    newMDB = mdb_node_set_mdbPrev(srcMDB, CTE_REF(srcSlot));
+    newMDB = mdb_node_set_mdbRevocable(newMDB, mdb_node_get_mdbRevocable(srcSlot->cteMDBNode));
+    newMDB = mdb_node_set_mdbFirstBadged(newMDB, mdb_node_get_mdbFirstBadged(srcSlot->cteMDBNode));
+
+    /* Haskell error: "cteInsert to non-empty destination" */
+    assert(cap_get_capType(destSlot->cap) == cap_null_cap);
+    /* Haskell error: "cteInsert: mdb entry must be empty" */
+    assert((cte_t *)mdb_node_get_mdbNext(destSlot->cteMDBNode) == NULL &&
+           (cte_t *)mdb_node_get_mdbPrev(destSlot->cteMDBNode) == NULL);
+
+    /* Prevent parent untyped cap from being used again if creating a child
+     * untyped from it. */
+    setUntypedCapAsFull(srcCap, newCap, srcSlot);
+
+    destSlot->cap = newCap;
+    destSlot->cteMDBNode = newMDB;
+    mdb_node_ptr_set_mdbPrev(&srcSlot->cteMDBNode, CTE_REF(destSlot));
+    if (mdb_node_get_mdbPrev(newMDB)) {
+        mdb_node_ptr_set_mdbNext(
+            &CTE_PTR(mdb_node_get_mdbPrev(newMDB))->cteMDBNode,
             CTE_REF(destSlot));
     }
 }

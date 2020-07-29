@@ -491,6 +491,21 @@
             </param>
         </method>
 
+        <method id="CNodeCopySibling" name="Copy" manual_name="Copy" manual_label="cnode_copy">
+            <brief>
+                Copy a capability as a sibling, setting its access rights whilst doing so
+            </brief>
+            <description>
+                <docref>See <autoref label="sec:cnode-ops"/>.</docref>
+            </description>
+            <cap_param append_description="CPTR to the CNode that forms the root of the destination CSpace. Must be at a depth equivalent to the wordsize."/>
+            <param dir="in" name="dest_index" type="seL4_Word" description="CPTR to the destination slot. Resolved from the root of the destination CSpace."/>
+            <param dir="in" name="dest_depth" type="seL4_Uint8" description="Number of bits of dest_index to resolve to find the destination slot."/>
+            <param dir="in" name="src_root" type="seL4_CNode" description="CPTR to the CNode that forms the root of the source CSpace. Must be at a depth equivalent to the wordsize."/>
+            <param dir="in" name="src_index" type="seL4_Word" description="CPTR to the source slot. Resolved from the root of the source CSpace."/>
+            <param dir="in" name="src_depth" type="seL4_Uint8" description="Number of bits of src_index to resolve to find the source slot."/>
+        </method>
+
         <method id="CNodeMint" name="Mint" manual_name="Mint" manual_label="cnode_mint">
             <brief>
                 Copy a capability, setting its access rights and badge whilst doing so

@@ -24,10 +24,12 @@ exception_t invokeCNodeRevoke(cte_t *destSlot);
 exception_t invokeCNodeDelete(cte_t *destSlot);
 exception_t invokeCNodeCancelBadgedSends(cap_t cap);
 exception_t invokeCNodeInsert(cap_t cap, cte_t *srcSlot, cte_t *destSlot);
+exception_t invokeCNodeInsertSibling(cap_t cap, cte_t *srcSlot, cte_t *destSlot);
 exception_t invokeCNodeMove(cap_t cap, cte_t *srcSlot, cte_t *destSlot);
 exception_t invokeCNodeRotate(cap_t cap1, cap_t cap2, cte_t *slot1,
                               cte_t *slot2, cte_t *slot3);
 void cteInsert(cap_t newCap, cte_t *srcSlot, cte_t *destSlot);
+void cteInsertSibling(cap_t newCap, cte_t *srcSlot, cte_t *destSlot);
 void cteMove(cap_t newCap, cte_t *srcSlot, cte_t *destSlot);
 void capSwapForDelete(cte_t *slot1, cte_t *slot2);
 void cteSwap(cap_t cap1, cte_t *slot1, cap_t cap2, cte_t *slot2);
