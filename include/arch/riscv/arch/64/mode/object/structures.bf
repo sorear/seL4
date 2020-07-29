@@ -34,6 +34,17 @@ block frame_cap {
     field_high  capFMappedAddress   39
 }
 
+block span_cap {
+    field       capSpBaseOrSet      64
+
+    field       capType             5
+    field       capSpLengthOrIndex  55
+    field       capSpGranularity    1
+    field       capSpIsMapped       1
+    field       capSpIsWritable     1
+    field       capSpIsDevice       1
+}
+
 -- N-level page table
 block page_table_cap {
     field       capPTMappedASID     16
@@ -86,6 +97,7 @@ tagged_union cap capType {
     -- 5-bit tag arch caps
     tag frame_cap           1
     tag page_table_cap      3
+    tag span_cap            5
     tag asid_control_cap    11
     tag asid_pool_cap       13
 }
