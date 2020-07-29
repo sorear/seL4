@@ -16,6 +16,7 @@ typedef enum _object {
     seL4_RISCV_Mega_Page,
     seL4_RISCV_Span,
     seL4_RISCV_PageTableObject,
+    seL4_RISCV_SpanSet,
     seL4_ObjectTypeCount
 } seL4_ArchObjectType;
 

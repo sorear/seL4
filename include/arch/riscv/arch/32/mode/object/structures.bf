@@ -52,6 +52,13 @@ block page_table_cap {
     field       capType             4
 }
 
+block span_set_cap {
+    field       capSSetPtr          32
+
+    padding                         28
+    field       capType             4
+}
+
 -- Cap to the table of 1 ASID pool
 block asid_control_cap {
     padding             32
@@ -99,6 +106,9 @@ tagged_union cap capType {
     tag sched_context_cap   0x4e
     tag sched_control_cap   0x5e
 #endif
+
+    -- 8-bit tag arch caps
+    tag span_set_cap        0x0f
 }
 
 ---- Arch-independent object types

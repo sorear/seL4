@@ -297,9 +297,12 @@ cap_t Arch_createObject(object_t t, void *regionBase, word_t userSize, bool_t
                    granularity,            /* capSpGranularity */
                    0,                      /* capSpIsMapped */
                    1,                      /* capSpIsWritable */
-                   deviceMemory,           /* capSpIsDevice */
+                   deviceMemory            /* capSpIsDevice */
                );
     }
+
+    case seL4_RISCV_SpanSet:
+        return cap_span_set_cap_new((word_t)regionBase);
 
     case seL4_RISCV_PageTableObject:
         /** AUXUPD: "(True, ptr_retyps 1

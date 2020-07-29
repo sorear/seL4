@@ -57,6 +57,13 @@ block page_table_cap {
     field_high  capPTMappedAddress  39
 }
 
+block span_set_cap {
+    field       capSSetPtr          64
+
+    field       capType             5
+    padding                         59
+}
+
 -- Cap to the table of 2^6 ASID pools
 block asid_control_cap {
     padding 64
@@ -98,6 +105,7 @@ tagged_union cap capType {
     tag frame_cap           1
     tag page_table_cap      3
     tag span_cap            5
+    tag span_set_cap        7
     tag asid_control_cap    11
     tag asid_pool_cap       13
 }

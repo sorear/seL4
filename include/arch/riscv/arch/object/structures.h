@@ -37,6 +37,13 @@ typedef struct arch_tcb {
     user_context_t tcbContext;
 } arch_tcb_t;
 
+typedef struct span_set {
+    /* fixme: configurable */
+    word_t pmpcfg[1];
+    word_t pmpaddr[8];
+    word_t backlink[8];
+} span_set_t;
+
 enum vm_rights {
     VMKernelOnly = 1,
     VMReadOnly = 2,
@@ -57,6 +64,11 @@ typedef pte_t pde_t;
 #define PT_SIZE_BITS 12
 #define PT_PTR(r) ((pte_t *)(r))
 #define PT_REF(p) ((word_t)(p))
+
+/* fixme: configurable */
+#define SPAN_SET_BITS 8
+#define SPAN_SET_PTR(r) ((span_set_t *)(r))
+#define SPAN_SET_REF(p) ((word_t)(p))
 
 #define PTE_SIZE_BITS   seL4_PageTableEntryBits
 #define PT_INDEX_BITS   seL4_PageTableIndexBits
@@ -79,6 +91,9 @@ static inline bool_t CONST cap_get_archCapIsPhysical(cap_t cap)
         return true;
 
     case cap_page_table_cap:
+        return true;
+
+    case cap_span_set_cap:
         return true;
 
     case cap_asid_control_cap:
@@ -110,6 +125,9 @@ static inline word_t CONST cap_get_archCapSizeBits(cap_t cap)
     case cap_page_table_cap:
         return PT_SIZE_BITS;
 
+    case cap_span_set_cap:
+        return SPAN_SET_BITS;
+
     case cap_asid_control_cap:
         return 0;
 
@@ -139,6 +157,9 @@ static inline void *CONST cap_get_archCapPtr(cap_t cap)
 
     case cap_page_table_cap:
         return PT_PTR(cap_page_table_cap_get_capPTBasePtr(cap));
+
+    case cap_span_set_cap:
+        return SPAN_SET_PTR(cap_span_set_cap_get_capSSetPtr(cap));
 
     case cap_asid_control_cap:
         return NULL;
