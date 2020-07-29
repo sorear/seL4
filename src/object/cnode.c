@@ -806,6 +806,10 @@ bool_t PURE isMDBParentOf(cte_t *cte_a, cte_t *cte_b)
         break;
     }
 
+    /* fixme: does not belong here */
+    case cap_span_cap:
+        return !mdb_node_get_mdbFirstBadged(cte_b->cteMDBNode);
+
     default:
         return true;
         break;

@@ -75,6 +75,9 @@ static inline bool_t CONST cap_get_archCapIsPhysical(cap_t cap)
     case cap_frame_cap:
         return true;
 
+    case cap_span_cap:
+        return true;
+
     case cap_page_table_cap:
         return true;
 
@@ -99,6 +102,10 @@ static inline word_t CONST cap_get_archCapSizeBits(cap_t cap)
     switch (ctag) {
     case cap_frame_cap:
         return pageBitsForSize(cap_frame_cap_get_capFSize(cap));
+
+    case cap_span_cap:
+        /* somewhat of a lie but used for untyped revocation */
+        return 0;
 
     case cap_page_table_cap:
         return PT_SIZE_BITS;
@@ -126,6 +133,9 @@ static inline void *CONST cap_get_archCapPtr(cap_t cap)
 
     case cap_frame_cap:
         return (void *)(cap_frame_cap_get_capFBasePtr(cap));
+
+    case cap_span_cap:
+        return (void *)(cap_span_cap_get_capSpBaseOrSet(cap));
 
     case cap_page_table_cap:
         return PT_PTR(cap_page_table_cap_get_capPTBasePtr(cap));

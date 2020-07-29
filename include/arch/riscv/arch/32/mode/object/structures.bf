@@ -30,9 +30,9 @@ block frame_cap {
 }
 
 block span_cap {
-    field       capSpBaseSet        32
+    field       capSpBaseOrSet      32
 
-    field       capSpSizeIndex      24
+    field       capSpSizeOrIndex    24
     field       capSpGranularity    1
     field       capSpIsMapped       1
     field       capSpWritable       1

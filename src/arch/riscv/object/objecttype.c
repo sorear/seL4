@@ -37,6 +37,7 @@ deriveCap_ret_t Arch_deriveCap(cte_t *slot, cap_t cap)
         ret.status = EXCEPTION_NONE;
         return ret;
 
+    case cap_span_cap:
     case cap_asid_control_cap:
     case cap_asid_pool_cap:
         ret.cap = cap;
@@ -128,6 +129,12 @@ bool_t CONST Arch_sameRegionAs(cap_t cap_a, cap_t cap_b)
             topA = botA + MASK(pageBitsForSize(cap_frame_cap_get_capFSize(cap_a)));
             topB = botB + MASK(pageBitsForSize(cap_frame_cap_get_capFSize(cap_b))) ;
             return ((botA <= botB) && (topA >= topB) && (botB <= topB));
+        }
+        break;
+
+    case cap_span_cap:
+        if (cap_get_capType(cap_b) == cap_span_cap) {
+            return true;
         }
         break;
 
