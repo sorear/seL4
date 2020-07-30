@@ -500,6 +500,13 @@ void cteInsertSibling(cap_t newCap, cte_t *srcSlot, cte_t *destSlot)
     }
 }
 
+static void afterCapMove(cte_t *slot, cap_t cap)
+{
+    if (isArchCap(cap)) {
+        Arch_afterCapMove(slot, cap);
+    }
+}
+
 void cteMove(cap_t newCap, cte_t *srcSlot, cte_t *destSlot)
 {
     mdb_node_t mdb;
@@ -528,6 +535,8 @@ void cteMove(cap_t newCap, cte_t *srcSlot, cte_t *destSlot)
         mdb_node_ptr_set_mdbPrev(
             &CTE_PTR(next_ptr)->cteMDBNode,
             CTE_REF(destSlot));
+
+    afterCapMove(destSlot, destSlot->cap);
 }
 
 void capSwapForDelete(cte_t *slot1, cte_t *slot2)
@@ -581,6 +590,9 @@ void cteSwap(cap_t cap1, cte_t *slot1, cap_t cap2, cte_t *slot2)
         mdb_node_ptr_set_mdbPrev(
             &CTE_PTR(next_ptr)->cteMDBNode,
             CTE_REF(slot1));
+
+    afterCapMove(slot1, slot1->cap);
+    afterCapMove(slot2, slot2->cap);
 }
 
 exception_t cteRevoke(cte_t *slot)

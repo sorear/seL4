@@ -23,6 +23,7 @@ exception_t Arch_decodeInvocation(word_t label, word_t length,
                                   cptr_t cptr, cte_t *slot, cap_t cap,
                                   extra_caps_t extraCaps, bool_t call, word_t *buffer);
 void Arch_prepareThreadDelete(tcb_t *thread);
+void Arch_afterCapMove(cte_t *slot, cap_t cap);
 word_t Arch_getObjectSize(word_t t);
 bool_t Arch_isFrameType(word_t type);
 

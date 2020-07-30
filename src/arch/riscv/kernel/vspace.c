@@ -586,6 +586,15 @@ cap_t getOriginalSpan(cap_t cap)
     return cap;
 }
 
+void Arch_afterCapMove(cte_t *slot, cap_t cap)
+{
+    if (cap_capType_equals(cap, cap_span_cap) && cap_span_cap_get_capSpIsMapped(cap)) {
+        span_set_t *set = SPAN_SET_PTR(cap_span_cap_get_capSpBaseOrSet(cap));
+        word_t index = cap_span_cap_get_capSpLengthOrIndex(cap);
+        set->backlink[index] = CTE_REF(slot);
+    }
+}
+
 void unmapSpan(span_set_t *set, word_t index, bool_t updateSlot)
 {
     /* fixme: wordsize, coding style */
