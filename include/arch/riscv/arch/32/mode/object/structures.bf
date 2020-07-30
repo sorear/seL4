@@ -126,7 +126,8 @@ block VMFault {
 -- VM attributes
 
 block vm_attributes {
-    padding 31
+    padding 30
+    field riscvExecuteOnly   1
     field riscvExecuteNever  1
 }
 

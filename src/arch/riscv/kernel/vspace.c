@@ -834,6 +834,171 @@ static exception_t decodeRISCVPageTableInvocation(word_t label, word_t length,
     return performPageTableInvocationMap(cap, cte, pte, ptSlot);
 }
 
+static exception_t decodeRISCVSpanInvocation(word_t label, word_t length,
+                                             cte_t *cte, cap_t cap, extra_caps_t extraCaps,
+                                             word_t *buffer)
+{
+    switch (label) {
+    case RISCVSpanMap: {
+        if (unlikely(length < 3 || extraCaps.excaprefs[0] == NULL)) {
+            userError("RISCVSpanMap: Truncated message.");
+            current_syscall_error.type = seL4_TruncatedMessage;
+            return EXCEPTION_SYSCALL_ERROR;
+        }
+
+        word_t index = getSyscallArg(0, buffer);
+        word_t w_rightsMask = getSyscallArg(1, buffer);
+        vm_attributes_t attr = vmAttributesFromWord(getSyscallArg(2, buffer));
+        cap_t ssetCap = extraCaps.excaprefs[0]->cap;
+
+        if (unlikely(!cap_capType_equals(ssetCap, cap_span_set_cap))) {
+            userError("RISCVSpanMap: Bad SpanSet cap.");
+            current_syscall_error.type = seL4_InvalidCapability;
+            current_syscall_error.invalidCapNumber = 1;
+            return EXCEPTION_SYSCALL_ERROR;
+        }
+
+        span_set_t *set = SPAN_SET_PTR(cap_span_set_cap_get_capSSetPtr(ssetCap));
+
+        cap_t spanData = getOriginalSpan(cap);
+        word_t base = cap_span_cap_get_capSpBaseOrSet(spanData) / 4;
+        word_t length = cap_span_cap_get_capSpLengthOrIndex(spanData);
+        vm_rights_t capVMRights = cap_span_cap_get_capSpIsWritable(spanData) ? VMReadWrite : VMReadOnly;
+        if (cap_span_cap_get_capSpGranularity(spanData)) {
+            length *= 256;
+        }
+        bool_t napot_allowed = (length & (length - 1)) == 0 && (base & (length - 1)) == 0;
+
+        /* check the index is valid */
+        /* fixme: parameterizability */
+        if (unlikely(index > 8 || (index == 0 && !napot_allowed && base != 0))) {
+            current_syscall_error.type = seL4_InvalidArgument;
+            current_syscall_error.invalidArgumentNumber = 0;
+            return EXCEPTION_SYSCALL_ERROR;
+        }
+
+        vm_rights_t vmRights = maskVMRights(capVMRights, rightsFromWord(w_rightsMask));
+
+        setThreadState(NODE_STATE(ksCurThread), ThreadState_Restart);
+        /* fixme: verifiable style */
+        if (cap_span_cap_get_capSpIsMapped(cap)) {
+            unmapSpan(SPAN_SET_PTR(cap_span_cap_get_capSpBaseOrSet(cap)), cap_span_cap_get_capSpLengthOrIndex(cap), true);
+        }
+        word_t pmpcfg = 0;
+        if (!vm_attributes_get_riscvExecuteOnly(attr)) {
+            pmpcfg |= 1;
+        }
+        if (vmRights == VMReadWrite) {
+            pmpcfg |= 2;
+        }
+        if (!vm_attributes_get_riscvExecuteNever(attr)) {
+            pmpcfg |= 4;
+        }
+        if (vmRights == VMKernelOnly) {
+            pmpcfg = 0;
+        }
+        if (length == 1) {
+            unmapSpan(set, index, true);
+            pmpcfg |= 1 << 3;
+            set->pmpaddr[index] = base;
+        } else if (napot_allowed) {
+            unmapSpan(set, index, true);
+            pmpcfg |= 2 << 3;
+            set->pmpaddr[index] = base + (length / 2) - 1;
+        } else {
+            if (index != 0 && set->pmpaddr[index - 1] != base) {
+                unmapSpan(set, index - 1, true);
+            }
+            unmapSpan(set, index, true);
+            pmpcfg |= 3 << 3;
+            if (index != 0) {
+                set->pmpaddr[index - 1] = base;
+            }
+            set->pmpaddr[index] = base + length;
+        }
+        set->pmpcfg[index / 8] &= ~(255 << (index % 8) * 8);
+        set->pmpcfg[index / 8] |= pmpcfg << (index % 8) * 8;
+        cap = cap_span_cap_set_capSpIsMapped(cap, 1);
+        cap = cap_span_cap_set_capSpBaseOrSet(cap, SPAN_SET_REF(set));
+        cap = cap_span_cap_set_capSpLengthOrIndex(cap, index);
+        cte->cap = cap;
+        set->backlink[index] = CTE_REF(cte);
+        return EXCEPTION_NONE;
+    }
+
+    case RISCVSpanUnmap:
+        if (cap_span_cap_get_capSpIsMapped(cap)) {
+            unmapSpan(SPAN_SET_PTR(cap_span_cap_get_capSpBaseOrSet(cap)), cap_span_cap_get_capSpLengthOrIndex(cap), true);
+        }
+        return EXCEPTION_NONE;
+
+    case RISCVSpanDiminish: {
+        if (unlikely(length < 3)) {
+            userError("RISCVSpanDiminish: Truncated message.");
+            current_syscall_error.type = seL4_TruncatedMessage;
+            return EXCEPTION_SYSCALL_ERROR;
+        }
+        word_t requestedRights = getSyscallArg(0, buffer);
+        word_t requestedStart = getSyscallArg(1, buffer);
+        word_t requestedLen = getSyscallArg(2, buffer);
+
+        cap_t spanData = getOriginalSpan(cap);
+        vm_rights_t oldRights = cap_span_cap_get_capSpIsWritable(spanData) ? VMReadWrite : VMReadOnly;
+        word_t oldStart = cap_span_cap_get_capSpBaseOrSet(spanData) / 4;
+        word_t oldLen = cap_span_cap_get_capSpLengthOrIndex(spanData);
+        if (cap_span_cap_get_capSpGranularity(spanData)) {
+            oldLen *= 256;
+        }
+
+        /* fixme: handle pmp granularity here */
+        if ((requestedStart % 4) || (requestedLen % 4) || requestedLen == 0 || (wordBits == 32 && requestedLen >= 0x4000000 && (requestedLen % 1024))) {
+            userError("RISCVSpanDiminish: Attempted to set unrepresentable range.");
+            current_syscall_error.type = seL4_InvalidArgument;
+            return EXCEPTION_SYSCALL_ERROR;
+        }
+
+        if (requestedRights != VMReadWrite && requestedRights != VMReadOnly) {
+            userError("RISCVSpanDiminish: Attempted to set unrepresentable rights.");
+            current_syscall_error.type = seL4_InvalidArgument;
+            return EXCEPTION_SYSCALL_ERROR;
+        }
+
+        if (requestedRights == VMReadWrite && oldRights != VMReadWrite) {
+            userError("RISCVSpanDiminish: Attempted to increase span rights.");
+            current_syscall_error.type = seL4_IllegalOperation;
+            return EXCEPTION_SYSCALL_ERROR;
+        }
+
+        if (requestedStart < 4 * oldStart || requestedStart - 4 * oldStart > 4 * oldLen || requestedLen > 4 * oldLen - (requestedStart - 4 * oldStart)) {
+            userError("RISCVSpanDiminish: Attempted to increase span extent.");
+            current_syscall_error.type = seL4_IllegalOperation;
+            return EXCEPTION_SYSCALL_ERROR;
+        }
+
+        /* fixme: verifiable style */
+        if (cap_span_cap_get_capSpIsMapped(cap)) {
+            unmapSpan(SPAN_SET_PTR(cap_span_cap_get_capSpBaseOrSet(cap)), cap_span_cap_get_capSpLengthOrIndex(cap), true);
+        }
+        cap = cte->cap;
+        cap = cap_span_cap_set_capSpBaseOrSet(cap, requestedStart);
+        if (wordBits == 32 && requestedLen >= 0x4000000) {
+            cap = cap_span_cap_set_capSpLengthOrIndex(cap, requestedLen >> 10);
+            cap = cap_span_cap_set_capSpGranularity(cap, 1);
+        } else {
+            cap = cap_span_cap_set_capSpLengthOrIndex(cap, requestedLen >> 2);
+            cap = cap_span_cap_set_capSpGranularity(cap, 0);
+        }
+        cte->cap = cap;
+        return EXCEPTION_NONE;
+    }
+    default:
+        userError("RISCVSpan: Illegal operation.");
+        current_syscall_error.type = seL4_IllegalOperation;
+
+        return EXCEPTION_SYSCALL_ERROR;
+    }
+}
+
 static exception_t decodeRISCVFrameInvocation(word_t label, word_t length,
                                               cte_t *cte, cap_t cap, extra_caps_t extraCaps,
                                               word_t *buffer)
@@ -979,6 +1144,9 @@ exception_t decodeRISCVMMUInvocation(word_t label, word_t length, cptr_t cptr,
     case cap_frame_cap:
         return decodeRISCVFrameInvocation(label, length, cte, cap, extraCaps, buffer);
 
+    case cap_span_cap:
+        return decodeRISCVSpanInvocation(label, length, cte, cap, extraCaps, buffer);
+
     case cap_asid_control_cap: {
         word_t     i;
         asid_t           asid_base;
@@ -1052,6 +1220,10 @@ exception_t decodeRISCVMMUInvocation(word_t label, word_t length, cptr_t cptr,
         setThreadState(NODE_STATE(ksCurThread), ThreadState_Restart);
         return performASIDControlInvocation(frame, destSlot, parentSlot, asid_base);
     }
+
+    case cap_span_set_cap:
+        current_syscall_error.type = seL4_IllegalOperation;
+        return EXCEPTION_SYSCALL_ERROR;
 
     case cap_asid_pool_cap: {
         cap_t        vspaceCap;

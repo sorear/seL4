@@ -126,6 +126,69 @@
             <param dir="out" name="paddr" type="seL4_Word"/>
         </method>
     </interface>
+    <interface name="seL4_RISCV_Span" manual_name="Span" cap_description="The capability to the Span to invoke.">
+        <method id="RISCVSpanMap" name="Map">
+            <brief>
+                Maps a span into a span set.
+            </brief>
+            <description>
+                Takes a non-paging VSpace capability (a SpanSet) and installs this Span in it at the given region index.
+                If another Span is mapped at the given index, it will be unmapped first.
+                If this Span lacks power-of-two size and natural alignment, it requires two region indices; the passed index is the second of the two, and any Span mapped at the first index will also be unmapped.
+            </description>
+            <param dir="in" name="vspace" type="seL4_RISCV_SpanSet">
+                <description>VSpace to map the span into.</description>
+            </param>
+            <param dir="in" name="index" type="seL4_Word">
+                <description>Region index to map the span at.</description>
+            </param>
+            <param dir="in" name="rights" type="seL4_CapRights_t">
+                <description>
+                    Rights for the mapping. <docref>Possible values for this type are given in <autoref label="sec:cap_rights"/>.</docref>
+                </description>
+            </param>
+            <param dir="in" name="attr" type="seL4_RISCV_VMAttributes">
+            <description>
+                VM Attributes for the mapping. <docref>Possible values for this type are given
+                in <autoref label="ch:vspace"/>.</docref>
+            </description>
+            </param>
+        </method>
+        <method id="RISCVSpanUnmap" name="Unmap">
+            <brief>
+                Unmaps the current span from its span set.
+            </brief>
+            <description>
+                Unmaps the current span from its span set, if any.  No operation if the span is not currently mapped.
+            </description>
+        </method>
+        <method id="RISCVSpanDiminish" name="Diminish">
+            <brief>
+                Shrinks or reduces the capability rights of the current span.
+            </brief>
+            <description>
+                Sets the writability state, start, and length of the span to the provided values, assuming that they are a subset of the current writability state and extents.
+                If the provided values do not reflect a reduction of access relative to the current access, fails with a seL4_IllegalOperation error.
+                If the provided values are not representable as a hardware region, fails with a seL4_InvalidArgument error.
+            </description>
+            <param dir="in" name="rights" type="seL4_CapRights_t">
+                <description>
+                    New rights for the span. <docref>Possible values for this type are given in <autoref label="sec:cap_rights"/>.</docref>
+                </description>
+            </param>
+            <param dir="in" name="start" type="seL4_Word">
+                <description>
+                    New starting physical address for the span.
+                    Alignment requirements may apply depending on and independent of the length.
+                </description>
+            </param>
+            <param dir="in" name="length" type="seL4_Word">
+                <description>
+                    New physical length for the span, in bytes.
+                </description>
+            </param>
+        </method>
+    </interface>
     <interface name="seL4_RISCV_ASIDControl" manual_name="ASID Control"
         cap_description="The master ASIDControl capability to invoke.">
         <method id="RISCVASIDControlMakePool" name="MakePool">
